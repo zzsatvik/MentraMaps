@@ -1,0 +1,27 @@
+{
+  "name": "mentra-maps-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Mentra Maps navigation system",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["navigation", "maps", "directions", "accessibility"],
+  "author": "Mentra Maps Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.8.0",
+    "tsx": "^4.1.0",
+    "typescript": "^5.2.2"
+  }
+} 
