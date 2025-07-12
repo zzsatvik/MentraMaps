@@ -1,0 +1,17 @@
+{
+  "name": "my-first-mentraos-app",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "bun run dist/index.js",
+    "dev": "bun --watch src/index.ts"
+  },
+  "dependencies": {
+    "@mentra/sdk": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  }
+}
