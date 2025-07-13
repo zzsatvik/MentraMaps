@@ -1,16 +1,19 @@
-import { AppServer, AppSession } from '@mentra/sdk';
+import { AppServer, AppSession, createTranscriptionStream } from '@mentra/sdk';
+import { GoogleDirectionsAPI } from './google-directions';
 
 // Load configuration from environment variables
 const PACKAGE_NAME = process.env.PACKAGE_NAME || "com.example.geminibuttontest";
 const PORT = parseInt(process.env.PORT || "3001");
 const MENTRAOS_API_KEY = process.env.MENTRAOS_API_KEY || "demo_key";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID;
 
 console.log("=== MentraOS Gemini Button Test ===");
 console.log(`Package Name: ${PACKAGE_NAME}`);
 console.log(`Port: ${PORT}`);
 console.log(`API Key: ${MENTRAOS_API_KEY ? "Set" : "Not set"}`);
 console.log(`Gemini API Key: ${GEMINI_API_KEY ? "Set" : "Not set"}`);
+console.log(`ElevenLabs Voice ID: ${ELEVENLABS_VOICE_ID ? "Set" : "Not set"}`);
 console.log("===================================");
 
 if (!MENTRAOS_API_KEY || MENTRAOS_API_KEY === "demo_key") {
@@ -23,6 +26,10 @@ if (!GEMINI_API_KEY) {
    console.error("GEMINI_API_KEY environment variable is required");
    console.error("Please set it with: export GEMINI_API_KEY=your_gemini_api_key");
    console.error("Gemini functionality will be disabled...");
+}
+
+if (!ELEVENLABS_VOICE_ID) {
+    console.warn("⚠️ ELEVENLABS_VOICE_ID not set - TTS will be disabled");
 }
 
 // Simple Gemini API client
@@ -92,102 +99,139 @@ class GeminiButtonTestApp extends AppServer {
        } else {
            console.log("⚠️ Gemini client not initialized - no API key");
        }
+       
+       const googleDirections = new GoogleDirectionsAPI();
 
-       // Custom user prompt - change this to whatever you want to ask!
-       const userPrompt = "Where is the nearest coffee shop?";
+       // Transcription state
+       let isListening = false;
+       createTranscriptionStream('en-US');
+       console.log("🎤 Created English transcription stream");
 
-       // Track if we've already processed a request
-       let hasProcessed = false;
-
-       // Navigation-focused prompt template
-       const createNavigationPrompt = (userLocation: { latitude: number; longitude: number }) => {
-           return `You are an assistant but also a primary navigation tool. 
-
-If asked with something like "where the nearest ___ is" or something along those lines, answer with an address.
-
-If asked with "how you can get to some place" or something along those lines, answer with a placeholder "bob".
-
-If needed, the user's exact location in coordinates is: ${userLocation.latitude}, ${userLocation.longitude}
-
-Please respond naturally and helpfully to any navigation-related questions.
-
-Here is the user's prompt: ${userPrompt}`;
+       // More flexible prompt for Gemini
+       const createPrompt = (context: string) => {
+           return `You are a helpful assistant. Please respond naturally to the user's request based on the following context.
+           
+Context:
+${context}
+`;
        };
+       
+       // Listen for final transcription data
+       session.events.onTranscription(async (data) => {
+           if (isListening && data.isFinal) {
+               isListening = false; // Stop listening once we have a final result
+               const userPrompt = data.text;
+               console.log(`✅ FINAL TRANSCRIPTION: "${userPrompt}"`);
 
-       // Listen for button presses
-       session.events.onButtonPress(async (data) => {
-           console.log(`🔘 BUTTON PRESSED!`);
-           console.log(`Button ID: ${data.buttonId}`);
-           console.log(`Full button data:`, JSON.stringify(data, null, 2));
-           console.log(`Timestamp: ${new Date().toISOString()}`);
-
-           // Only process the first button press, ignore all others
-           if (hasProcessed) {
-               console.log("⏳ Already processed a request, ignoring this button press");
-               return;
-           }
-
-           if (!geminiClient) {
-               console.log("❌ Gemini not available - no API key");
-               return;
-           }
-
-           hasProcessed = true;
-
-           try {
-               // Try to get current location with high accuracy
-               console.log("📍 Getting current location...");
-               let currentLocation;
-               
-               try {
-                   const location = await session.location.getLatestLocation({ accuracy: 'high' });
-                   currentLocation = {
-                       latitude: location.lat,
-                       longitude: location.lng
-                   };
-                   console.log(` Location obtained: ${location.lat}, ${location.lng}`);
-               } catch (locationError) {
-                   console.log("⚠️ Could not get precise location, using fallback coordinates");
-                   // Fallback to a default location (you can change this)
-                   currentLocation = {
-                       latitude: 37.7749,  // San Francisco coordinates
-                       longitude: -122.4194
-                   };
-                   console.log(` Using fallback location: ${currentLocation.latitude}, ${currentLocation.longitude}`);
+               if (!geminiClient) {
+                   console.log("❌ Gemini not available - no API key");
+                   session.layouts.showTextWall("❌ Gemini not available");
+                   return;
                }
 
-               // Create prompt with location
-               const navigationPrompt = createNavigationPrompt(currentLocation);
-               console.log(`📝 Using navigation prompt with location: ${currentLocation.latitude}, ${currentLocation.longitude}`);
+               try {
+                   // Get current location with high accuracy
+                   session.layouts.showTextWall("🤔 Thinking...");
+                   console.log("📍 Getting current location...");
+                   let currentLocation;
+                   
+                   try {
+                       const location = await session.location.getLatestLocation({ accuracy: 'high' });
+                       currentLocation = {
+                           latitude: location.lat,
+                           longitude: location.lng
+                       };
+                       console.log(`📍 Location obtained: ${location.lat}, ${location.lng}`);
+                   } catch (locationError) {
+                       console.log("⚠️ Could not get precise location, using fallback coordinates");
+                       currentLocation = {
+                           latitude: 37.7749,  // San Francisco coordinates
+                           longitude: -122.4194
+                       };
+                       console.log(`📍 Using fallback location: ${currentLocation.latitude}, ${currentLocation.longitude}`);
+                   }
 
-               // Generate response from Gemini
-               const response = await geminiClient.generateResponse(navigationPrompt);
-               
-               console.log(`🎯 FINAL RESULT:`);
-               console.log(`Location: ${currentLocation.latitude}, ${currentLocation.longitude}`);
-               console.log(`Response: "${response}"`);
-               console.log(`---`);
-               
-           } catch (error) {
-               console.error("❌ Error:", error);
-               // Reset the flag if there's an error so user can try again
-               hasProcessed = false;
+                   let response: string;
+
+                   // Check if the user is asking for the nearest place
+                   const nearestMatch = userPrompt.toLowerCase().match(/where is the nearest (.+)/);
+                   if (nearestMatch && nearestMatch[1]) {
+                       const placeQuery = nearestMatch[1].trim();
+                       console.log(`🔎 User is asking for the nearest: "${placeQuery}"`);
+                       
+                       const nearestPlace = await googleDirections.findNearest(placeQuery, {
+                           lat: currentLocation.latitude,
+                           lng: currentLocation.longitude
+                       });
+
+                       if (nearestPlace) {
+                           const context = `The user wants to know where the nearest ${placeQuery} is. I found a place called "${nearestPlace.name}" at ${nearestPlace.vicinity}. Please tell them this in a friendly way.`;
+                           const prompt = createPrompt(context);
+                           response = await geminiClient.generateResponse(prompt);
+                       } else {
+                           const context = `The user asked for the nearest ${placeQuery}, but I couldn't find anything nearby. Please apologize and let them know.`;
+                           const prompt = createPrompt(context);
+                           response = await geminiClient.generateResponse(prompt);
+                       }
+                   } else {
+                       // If not a "nearest" query, use the general prompt
+                       const prompt = createPrompt(`The user's location is ${currentLocation.latitude}, ${currentLocation.longitude}. The user said: "${userPrompt}"`);
+                       response = await geminiClient.generateResponse(prompt);
+                   }
+                   
+                   session.layouts.showTextWall(response);
+
+                   // Speak the response using ElevenLabs
+                   if (ELEVENLABS_VOICE_ID) {
+                       console.log(`️ Speaking response with ElevenLabs...`);
+                       await session.audio.speak(response, {
+                           voice_id: ELEVENLABS_VOICE_ID
+                       });
+                       console.log(`✅ Response spoken.`);
+                   } else {
+                       console.log("🔇 TTS disabled - no voice ID provided");
+                   }
+
+                   console.log(`🎯 FINAL RESULT:`);
+                   console.log(`Location: ${currentLocation.latitude}, ${currentLocation.longitude}`);
+                   console.log(`Response: "${response}"`);
+                   console.log(`---`);
+                   
+               } catch (error) {
+                   console.error("❌ Error:", error);
+                   session.layouts.showTextWall("❌ Error occurred");
+               }
+           }
+       });
+
+       // Listen for button presses to toggle listening
+       session.events.onButtonPress(async (data) => {
+           console.log(`🔘 BUTTON PRESSED! (Type: ${data.pressType})`);
+           
+           if (data.pressType === 'short') {
+               if (!isListening) {
+                   isListening = true;
+                   console.log(`🎤 STARTED LISTENING - Speak now!`);
+                   session.layouts.showTextWall("🎤 Listening...");
+               } else {
+                   isListening = false;
+                   console.log(`🛑 STOPPED LISTENING`);
+                   session.layouts.showTextWall("Press to speak");
+               }
            }
        });
 
        // Listen for session events
        session.events.onConnected(() => {
            console.log(`🔗 Session ${sessionId} connected`);
+           session.layouts.showTextWall("Press a button to talk to Gemini");
        });
 
        session.events.onDisconnected(() => {
            console.log(`🔌 Session ${sessionId} disconnected`);
        });
 
-       // Log available buttons (if any)
-       console.log("📋 Available buttons to press:");
-       console.log("- Any button on your Mentra glasses");
-       console.log("- Each press will generate a different response");
+       // Log instructions
        console.log("🚀 Ready to receive button presses!");
    }
 }
@@ -208,6 +252,11 @@ server.start().then(() => {
        console.log("🤖 Gemini API is enabled");
    } else {
        console.log("⚠️ Gemini API is disabled - set GEMINI_API_KEY to enable");
+   }
+   if (ELEVENLABS_VOICE_ID) {
+        console.log("🎤 ElevenLabs TTS is enabled");
+   } else {
+        console.log("🔇 ElevenLabs TTS is disabled - set ELEVENLABS_VOICE_ID to enable");
    }
 }).catch(err => {
    console.error("❌ Failed to start server:", err);

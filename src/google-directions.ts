@@ -42,9 +42,18 @@ interface RouteData {
     status: string;
 }
 
+interface Place {
+    name: string;
+    vicinity: string;
+    geometry: {
+        location: Location;
+    };
+}
+
 export class GoogleDirectionsAPI {
     private apiKey: string;
-    private baseUrl: string = 'https://maps.googleapis.com/maps/api/directions/json';
+    private directionsUrl: string = 'https://maps.googleapis.com/maps/api/directions/json';
+    private placesUrl: string = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
 
     // Hardcoded origin and destination coordinates
     private origin: Location = {
@@ -65,7 +74,7 @@ export class GoogleDirectionsAPI {
     }
 
     // Build the API URL with parameters
-    private buildApiUrl(): string {
+    private buildDirectionsApiUrl(): string {
         const params = new URLSearchParams({
             origin: `${this.origin.lat},${this.origin.lng}`,
             destination: `${this.destination.lat},${this.destination.lng}`,
@@ -73,7 +82,43 @@ export class GoogleDirectionsAPI {
             key: this.apiKey
         });
 
-        return `${this.baseUrl}?${params.toString()}`;
+        return `${this.directionsUrl}?${params.toString()}`;
+    }
+
+    // New method to find the nearest place
+    public async findNearest(query: string, location: Location): Promise<Place | null> {
+        if (!this.apiKey) {
+            console.warn("⚠️ Cannot find nearest place without a Google Maps API key.");
+            return null;
+        }
+
+        const params = new URLSearchParams({
+            location: `${location.lat},${location.lng}`,
+            radius: '1500', // Search within a 1500-meter radius
+            keyword: query,
+            rankby: 'distance', // Rank results by distance, which requires a keyword
+            key: this.apiKey
+        });
+
+        const url = `${this.placesUrl}?${params.toString()}`;
+        
+        try {
+            console.log(`🔎 Searching for nearest "${query}" near ${location.lat},${location.lng}`);
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.status === 'OK' && data.results.length > 0) {
+                const nearestPlace = data.results[0];
+                console.log(`✅ Found nearest place: ${nearestPlace.name} at ${nearestPlace.vicinity}`);
+                return nearestPlace;
+            } else {
+                console.log(`❌ Could not find any "${query}" nearby. Status: ${data.status}`);
+                return null;
+            }
+        } catch (error) {
+            console.error("❌ Error finding nearest place:", error);
+            return null;
+        }
     }
 
     // Fetch route data from Google Directions API
@@ -88,7 +133,7 @@ export class GoogleDirectionsAPI {
             console.log(`📍 Origin: ${this.origin.lat}, ${this.origin.lng}`);
             console.log(`🎯 Destination: ${this.destination.lat}, ${this.destination.lng}`);
 
-            const response = await fetch(this.buildApiUrl());
+            const response = await fetch(this.buildDirectionsApiUrl());
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -228,7 +273,7 @@ export class GoogleDirectionsAPI {
         }
 
         try {
-            const response = await fetch(this.buildApiUrl());
+            const response = await fetch(this.buildDirectionsApiUrl());
             const data: RouteData = await response.json();
             
             if (data.status === 'OK' && data.routes.length > 0) {
@@ -248,15 +293,21 @@ export class GoogleDirectionsAPI {
         }
 
         // Fallback
-        return this.getRouteSummary();
+        return {
+            totalSteps: 0,
+            totalDistance: "Unknown",
+            totalDuration: "Unknown",
+            startAddress: "Unknown",
+            endAddress: "Unknown",
+            origin: { lat: 0, lng: 0 },
+            destination: { lat: 0, lng: 0 }
+        };
     }
 
-    // Update origin and destination (if needed for future use)
+    // Update the route with new origin and destination
     public updateRoute(origin: Location, destination: Location): void {
         this.origin = origin;
         this.destination = destination;
-        console.log(`🗺️ Route updated:`);
-        console.log(`📍 New origin: ${origin.lat}, ${origin.lng}`);
-        console.log(`🎯 New destination: ${destination.lat}, ${destination.lng}`);
+        console.log(`🔄 Route updated: New origin ${origin.lat},${origin.lng} and destination ${destination.lat},${destination.lng}`);
     }
 } 
