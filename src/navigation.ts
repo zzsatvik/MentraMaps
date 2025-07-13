@@ -32,6 +32,18 @@ export class LiveNavigation {
     private isActive: boolean = false;
     private arrivalThreshold: number = 20; // 20 feet threshold for step completion
     private googleDirections: GoogleDirectionsAPI;
+    
+    // Turn alert thresholds
+    private turnAlert100Feet: number = 100; // 100 feet before turn
+    private turnAlert15Feet: number = 15;   // 15 feet before turn
+    
+    // Track which alerts have been shown to avoid duplicates
+    private alertsShown: {
+        [stepIndex: number]: {
+            alert100Feet: boolean;
+            alert15Feet: boolean;
+        }
+    } = {};
 
     constructor() {
         this.googleDirections = new GoogleDirectionsAPI();
@@ -43,6 +55,14 @@ export class LiveNavigation {
         try {
             this.routeSteps = await this.googleDirections.fetchRouteData();
             console.log(`🗺️ Loaded ${this.routeSteps.length} navigation steps from Google Directions API`);
+            
+            // Initialize alert tracking for each step
+            this.routeSteps.forEach((_, index) => {
+                this.alertsShown[index] = {
+                    alert100Feet: false,
+                    alert15Feet: false
+                };
+            });
         } catch (error) {
             console.error("❌ Error loading route data:", error);
             this.routeSteps = [];
@@ -74,6 +94,60 @@ export class LiveNavigation {
             .trim();
     }
 
+    // Check if a step involves a turn
+    private isTurnStep(step: RouteStep): boolean {
+        return step.maneuver === 'turn-left' || 
+               step.maneuver === 'turn-right' ||
+               step.html_instructions.toLowerCase().includes('turn left') ||
+               step.html_instructions.toLowerCase().includes('turn right');
+    }
+
+    // Get turn direction from step
+    private getTurnDirection(step: RouteStep): string {
+        if (step.maneuver === 'turn-left' || step.html_instructions.toLowerCase().includes('turn left')) {
+            return 'left';
+        } else if (step.maneuver === 'turn-right' || step.html_instructions.toLowerCase().includes('turn right')) {
+            return 'right';
+        }
+        return 'unknown';
+    }
+
+    // Check and trigger turn alerts
+    private checkTurnAlerts(userLocation: Location): void {
+        if (this.currentStepIndex >= this.routeSteps.length) return;
+
+        const currentStep = this.routeSteps[this.currentStepIndex];
+        
+        // Only check for turns
+        if (!this.isTurnStep(currentStep)) return;
+
+        const distanceToStep = this.calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            currentStep.end_location.lat,
+            currentStep.end_location.lng
+        );
+        const distanceInFeet = this.metersToFeet(distanceToStep);
+        const turnDirection = this.getTurnDirection(currentStep);
+
+        // Check 100 feet alert
+        if (distanceInFeet <= this.turnAlert100Feet && 
+            distanceInFeet > this.turnAlert15Feet && 
+            !this.alertsShown[this.currentStepIndex].alert100Feet) {
+            
+            console.log(`🚨 TURN ALERT: Turn ${turnDirection} in 100 feet!`);
+            this.alertsShown[this.currentStepIndex].alert100Feet = true;
+        }
+
+        // Check 15 feet alert
+        if (distanceInFeet <= this.turnAlert15Feet && 
+            !this.alertsShown[this.currentStepIndex].alert15Feet) {
+            
+            console.log(`🚨 TURN ALERT: Turn ${turnDirection} in 15 feet!`);
+            this.alertsShown[this.currentStepIndex].alert15Feet = true;
+        }
+    }
+
     // Start navigation
     public startNavigation(): void {
         this.currentStepIndex = 0;
@@ -97,6 +171,8 @@ export class LiveNavigation {
         isStepCompleted: boolean;
         isDestinationReached: boolean;
         progress: string;
+        isTurnStep: boolean;
+        turnDirection: string;
     } {
         if (!this.isActive || this.currentStepIndex >= this.routeSteps.length) {
             return {
@@ -107,7 +183,9 @@ export class LiveNavigation {
                 stepInstructions: "",
                 isStepCompleted: false,
                 isDestinationReached: this.currentStepIndex >= this.routeSteps.length,
-                progress: ""
+                progress: "",
+                isTurnStep: false,
+                turnDirection: ""
             };
         }
 
@@ -122,6 +200,8 @@ export class LiveNavigation {
         const stepInstructions = this.cleanInstructions(currentStep.html_instructions);
         const isStepCompleted = distanceInFeet <= this.arrivalThreshold;
         const progress = `Step ${this.currentStepIndex + 1}/${this.routeSteps.length}`;
+        const isTurnStep = this.isTurnStep(currentStep);
+        const turnDirection = this.getTurnDirection(currentStep);
 
         return {
             isActive: true,
@@ -131,7 +211,9 @@ export class LiveNavigation {
             stepInstructions,
             isStepCompleted,
             isDestinationReached: false,
-            progress
+            progress,
+            isTurnStep,
+            turnDirection
         };
     }
 
@@ -153,10 +235,21 @@ export class LiveNavigation {
             };
         }
 
+        // Check for turn alerts
+        this.checkTurnAlerts(userLocation);
+
         // Check if current step is completed
         if (status.isStepCompleted) {
             console.log(`🎯 Step ${this.currentStepIndex + 1} completed!`);
             this.currentStepIndex++;
+            
+            // Reset alerts for the next step
+            if (this.currentStepIndex < this.routeSteps.length) {
+                this.alertsShown[this.currentStepIndex] = {
+                    alert100Feet: false,
+                    alert15Feet: false
+                };
+            }
             
             // Check if destination is reached
             if (this.currentStepIndex >= this.routeSteps.length) {

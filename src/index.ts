@@ -96,9 +96,15 @@ class LiveNavigationApp extends AppServer {
                        console.log(`Instruction: ${status.stepInstructions}`);
                        console.log(`Distance to step end: ${status.distanceInFeet.toFixed(0)} ft`);
                        console.log(`Current location: ${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)}`);
+                       
+                       // Add turn information to console output
+                       if (status.isTurnStep) {
+                           console.log(`🔄 TURN STEP: ${status.turnDirection.toUpperCase()} turn ahead`);
+                       }
+                       
                        console.log("=========================");
 
-                       // Display navigation info on glasses
+                       // Display basic navigation info on glasses (no turn alerts)
                        const displayText = `${status.progress}\n\n${status.stepInstructions}\n\nDistance: ${status.distanceInFeet.toFixed(0)} ft`;
                        session.layouts.showTextWall(displayText);
                    }
