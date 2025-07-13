@@ -5,7 +5,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "bun run dist/index.js",
-    "dev": "bun --watch src/index.ts"
+    "dev": "bun --watch src/index.ts",
+    "gemini-test": "bun --watch src/gemini-button-test.ts",
+    "transcription-test": "bun --watch src/transcription-test.ts",
+    "audio-test": "bun --watch src/audio-transcription-test.ts"
   },
   "dependencies": {
     "@mentra/sdk": "latest",

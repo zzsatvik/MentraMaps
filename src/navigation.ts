@@ -35,13 +35,13 @@ export class LiveNavigation {
     
     // Turn alert thresholds
     private turnAlert100Feet: number = 100; // 100 feet before turn
-    private turnAlert15Feet: number = 15;   // 15 feet before turn
+    private turnAlert20Feet: number = 20;   // 20 feet before turn (changed from 15)
     
     // Track which alerts have been shown to avoid duplicates
     private alertsShown: {
         [stepIndex: number]: {
             alert100Feet: boolean;
-            alert15Feet: boolean;
+            alert20Feet: boolean;  // changed from alert15Feet
         }
     } = {};
 
@@ -70,7 +70,7 @@ export class LiveNavigation {
             this.routeSteps.forEach((_, index) => {
                 this.alertsShown[index] = {
                     alert100Feet: false,
-                    alert15Feet: false
+                    alert20Feet: false  // changed from alert15Feet
                 };
             });
         } catch (error) {
@@ -174,7 +174,7 @@ export class LiveNavigation {
 
         // Check 100 feet alert
         if (distanceInFeet <= this.turnAlert100Feet && 
-            distanceInFeet > this.turnAlert15Feet && 
+            distanceInFeet > this.turnAlert20Feet &&  // changed from turnAlert15Feet
             !this.alertsShown[this.currentStepIndex].alert100Feet) {
             
             const alertMessage = `Turn ${turnDirection} in 100 feet`;
@@ -183,14 +183,14 @@ export class LiveNavigation {
             this.alertsShown[this.currentStepIndex].alert100Feet = true;
         }
 
-        // Check 15 feet alert
-        if (distanceInFeet <= this.turnAlert15Feet && 
-            !this.alertsShown[this.currentStepIndex].alert15Feet) {
+        // Check 20 feet alert (changed from 15 feet)
+        if (distanceInFeet <= this.turnAlert20Feet && 
+            !this.alertsShown[this.currentStepIndex].alert20Feet) {  // changed from alert15Feet
             
-            const alertMessage = `Turn ${turnDirection} in 15 feet`;
+            const alertMessage = `Turn ${turnDirection} in 20 feet`;  // changed message
             console.log(`🚨 TURN ALERT: ${alertMessage}!`);
             await this.speakText(alertMessage, 'high');
-            this.alertsShown[this.currentStepIndex].alert15Feet = true;
+            this.alertsShown[this.currentStepIndex].alert20Feet = true;  // changed from alert15Feet
         }
     }
 
@@ -311,7 +311,7 @@ export class LiveNavigation {
             if (this.currentStepIndex < this.routeSteps.length) {
                 this.alertsShown[this.currentStepIndex] = {
                     alert100Feet: false,
-                    alert15Feet: false
+                    alert20Feet: false  // changed from alert15Feet
                 };
             }
             
