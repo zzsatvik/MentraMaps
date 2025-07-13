@@ -30,7 +30,11 @@ class LiveNavigationApp extends AppServer {
 
        // Initialize navigation system
        const navigation = new LiveNavigation();
-       const routeSummary = navigation.getRouteSummary();
+       
+       // Wait for route data to load
+       session.layouts.showTextWall("🗺️ Loading route data...");
+       
+       const routeSummary = await navigation.getRouteSummary();
        
        if (routeSummary.totalSteps === 0) {
            session.layouts.showTextWall("❌ No route data available");

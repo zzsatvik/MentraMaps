@@ -1,5 +1,4 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import { GoogleDirectionsAPI } from './google-directions';
 
 // Types for the route data
 interface Location {
@@ -26,33 +25,24 @@ interface RouteStep {
     travel_mode: string;
 }
 
-interface RouteData {
-    routes: Array<{
-        legs: Array<{
-            steps: RouteStep[];
-        }>;
-    }>;
-}
-
 // Navigation class to handle turn-by-turn navigation
 export class LiveNavigation {
     private routeSteps: RouteStep[] = [];
     private currentStepIndex: number = 0;
     private isActive: boolean = false;
     private arrivalThreshold: number = 20; // 20 feet threshold for step completion
+    private googleDirections: GoogleDirectionsAPI;
 
     constructor() {
+        this.googleDirections = new GoogleDirectionsAPI();
         this.loadRouteData();
     }
 
-    // Load route data from output.json
-    private loadRouteData(): void {
+    // Load route data from Google Directions API
+    private async loadRouteData(): Promise<void> {
         try {
-            const routeData: RouteData = JSON.parse(
-                fs.readFileSync(path.join(__dirname, '../output.json'), 'utf8')
-            );
-            this.routeSteps = routeData.routes[0].legs[0].steps;
-            console.log(`🗺️ Loaded ${this.routeSteps.length} navigation steps`);
+            this.routeSteps = await this.googleDirections.fetchRouteData();
+            console.log(`🗺️ Loaded ${this.routeSteps.length} navigation steps from Google Directions API`);
         } catch (error) {
             console.error("❌ Error loading route data:", error);
             this.routeSteps = [];
@@ -201,32 +191,38 @@ export class LiveNavigation {
     }
 
     // Get route summary
-    public getRouteSummary(): {
+    public async getRouteSummary(): Promise<{
         totalSteps: number;
         totalDistance: string;
         totalDuration: string;
         startAddress: string;
         endAddress: string;
-    } {
-        if (this.routeSteps.length === 0) {
+    }> {
+        try {
+            const summary = await this.googleDirections.getRouteSummary();
             return {
-                totalSteps: 0,
-                totalDistance: "0 ft",
-                totalDuration: "0 min",
-                startAddress: "",
-                endAddress: ""
+                totalSteps: summary.totalSteps,
+                totalDistance: summary.totalDistance,
+                totalDuration: summary.totalDuration,
+                startAddress: summary.startAddress,
+                endAddress: summary.endAddress
+            };
+        } catch (error) {
+            console.error("Error getting route summary:", error);
+            return {
+                totalSteps: this.routeSteps.length,
+                totalDistance: "Unknown",
+                totalDuration: "Unknown",
+                startAddress: "Unknown",
+                endAddress: "Unknown"
             };
         }
+    }
 
-        const totalDistance = this.routeSteps.reduce((sum, step) => sum + step.distance.value, 0);
-        const totalDuration = this.routeSteps.reduce((sum, step) => sum + step.duration.value, 0);
-        
-        return {
-            totalSteps: this.routeSteps.length,
-            totalDistance: `${Math.round(totalDistance * 3.28084)} ft`,
-            totalDuration: `${Math.round(totalDuration / 60)} min`,
-            startAddress: "3263 Cade Dr, Fremont, CA 94536, USA",
-            endAddress: "35238 Erving Ct, Fremont, CA 94536, USA"
-        };
+    // Refresh route data (useful for getting updated routes)
+    public async refreshRoute(): Promise<void> {
+        console.log("🔄 Refreshing route data...");
+        await this.loadRouteData();
+        console.log(`✅ Route refreshed: ${this.routeSteps.length} steps loaded`);
     }
 } 
