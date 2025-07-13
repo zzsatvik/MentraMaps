@@ -80,7 +80,7 @@ class LiveNavigationApp extends AppServer {
                    console.log("🚶 Navigation started - tracking user location");
                }
            }
-       );
+       );``
 
        console.log("✅ Location stream subscription created");
 

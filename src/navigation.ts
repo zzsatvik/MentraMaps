@@ -1,4 +1,5 @@
 import { GoogleDirectionsAPI } from './google-directions';
+import { beepData } from './beep';
 
 // Types for the route data
 interface Location {
@@ -48,6 +49,10 @@ export class LiveNavigation {
     // ElevenLabs TTS configuration
     private elevenLabsVoiceId: string;
     private audioSession: any = null; // Will be set by the main app
+    // Beeping configuration for blind-friendly turn awareness
+    private beepStartMeters: number = 200; // Begin beeping within 200 m of the turn
+    private beepPeriodMs: number = 2000;   // Beep cadence = 2 s
+    private lastBeepTime: number = 0;      // Timestamp of last beep (ms)
 
     constructor(elevenLabsVoiceId?: string) {
         this.googleDirections = new GoogleDirectionsAPI();
@@ -154,6 +159,22 @@ export class LiveNavigation {
         }
     }
 
+    // Play a short beep sound at the requested loudness (0-1)
+    private async playBeep(volume: number): Promise<void> {
+        if (!this.audioSession) return;
+
+        try {
+            await this.audioSession.playAudio({
+                data: beepData,
+                mimeType: 'audio/mpeg',
+                volume: Math.max(0, Math.min(1, volume))
+            });
+            console.log(`🔔 Beep! (vol=${volume.toFixed(2)})`);
+        } catch (error) {
+            console.error('❌ Beep error:', error);
+        }
+    }
+
     // Check and trigger turn alerts
     private async checkTurnAlerts(userLocation: Location): Promise<void> {
         if (this.currentStepIndex >= this.routeSteps.length) return;
@@ -170,6 +191,14 @@ export class LiveNavigation {
             currentStep.end_location.lng
         );
         const distanceInFeet = this.metersToFeet(distanceToStep);
+        // ────────────────────────────────────────────────
+        // Continuous beeping feedback as the user approaches the turn
+        const now = Date.now();
+        if (distanceToStep <= this.beepStartMeters && (now - this.lastBeepTime >= this.beepPeriodMs)) {
+            const volume = 1 - (distanceToStep / this.beepStartMeters);
+            await this.playBeep(volume);
+            this.lastBeepTime = now;
+        }
         const turnDirection = this.getTurnDirection(currentStep);
 
         // Check 100 feet alert
@@ -223,6 +252,8 @@ export class LiveNavigation {
     public stopNavigation(): void {
         this.isActive = false;
         console.log(" Navigation stopped");
+        // Ensure any pending beeps are halted
+        this.lastBeepTime = 0;
     }
 
     // Get current navigation status
