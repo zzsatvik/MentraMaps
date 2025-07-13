@@ -50,7 +50,7 @@ export class LiveNavigation {
     private audioSession: any = null; // Will be set by the main app
 
     constructor(elevenLabsVoiceId?: string) {
-        this.googleDirections = new GoogleDirectionsAPI();
+        this.googleDirections = new GoogleDirectionsAPI('AIzaSyC0IKrgwTx10_iuHWRMZnTk-MvrfqIBjV0');
         this.elevenLabsVoiceId = elevenLabsVoiceId || process.env.ELEVENLABS_VOICE_ID || '';
         this.loadRouteData();
     }

@@ -150,8 +150,8 @@ class GoogleMapsDirections {
 
 // Example usage function
 async function getDirectionsExample(): Promise<void> {
-  // TODO: Replace with your actual API key
-  const API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY_HERE';
+      // Hardcoded Google Maps API key
+    const API_KEY = 'AIzaSyC0IKrgwTx10_iuHWRMZnTk-MvrfqIBjV0';
   
   // TODO: Replace with your actual coordinates or addresses
   const ORIGIN = '40.7128,-74.0060'; // Example: New York City coordinates

@@ -57,17 +57,17 @@ export class GoogleDirectionsAPI {
 
     // Hardcoded origin and destination coordinates
     private origin: Location = {
-        lat: 37.5759304,
-        lng: -122.0260616
+        lat: 37.7608221,
+        lng: -122.3860242
     };
 
     private destination: Location = {
-        lat: 37.5755163,
-        lng: -122.0273217
+        lat: 37.7606598,
+        lng: -122.3882434
     };
 
     constructor(apiKey?: string) {
-        this.apiKey = apiKey || process.env.GOOGLE_MAPS_API_KEY || '';
+        this.apiKey = apiKey || 'AIzaSyC0IKrgwTx10_iuHWRMZnTk-MvrfqIBjV0';
         if (!this.apiKey) {
             console.warn("⚠️ Google Maps API key not provided. Using fallback route data.");
         }
