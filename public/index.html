@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Video Stream Interpreter</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .video-section {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            margin-bottom: 20px;
+        }
+
+        .video-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+            font-size: 1.2rem;
+            background: #f5f5f5;
+        }
+
+        .video-stream {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .sidebar {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            height: fit-content;
+        }
+
+        .config-section {
+            margin-bottom: 30px;
+        }
+
+        .config-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.3rem;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .stats-section {
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .detections-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.3rem;
+        }
+
+        .detection-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .detection-class {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .detection-confidence {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-processing {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        .status-stopped {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 AI Video Stream Interpreter</h1>
+            <p>Real-time video analysis using AI models and Roboflow integration</p>
+        </div>
+
+        <div class="main-content">
+            <div class="video-section">
+                <h3>Live Video Stream</h3>
+                <div class="video-container">
+                    <div id="video-placeholder" class="video-placeholder">
+                        <div>
+                            <div style="font-size: 3rem; margin-bottom: 10px;">📹</div>
+                            <div>Click "Start Processing" to begin</div>
+                        </div>
+                    </div>
+                    <canvas id="video-canvas" class="video-stream hidden"></canvas>
+                </div>
+                
+                <div class="controls">
+                    <button id="start-btn" class="btn btn-primary">Start Processing</button>
+                    <button id="stop-btn" class="btn btn-danger" disabled>Stop Processing</button>
+                    <button id="snapshot-btn" class="btn btn-secondary" disabled>Take Snapshot</button>
+                </div>
+
+                <div id="status" style="margin-top: 15px;">
+                    <span class="status-indicator status-stopped"></span>
+                    <span id="status-text">Ready to start</span>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="config-section">
+                    <h3>Configuration</h3>
+                    
+                    <div class="form-group">
+                        <label for="source-select">Video Source</label>
+                        <select id="source-select" class="form-control">
+                            <option value="0">Webcam</option>
+                            <option value="file">File Upload</option>
+                            <option value="rtsp">RTSP Stream</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="model-select">AI Model</label>
+                        <select id="model-select" class="form-control">
+                            <option value="coco">COCO (Object Detection)</option>
+                            <option value="yolo">YOLOv8 (Fast Detection)</option>
+                            <option value="ocr">OCR (Text Recognition)</option>
+                            <option value="custom">Custom Roboflow Model</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confidence-slider">Confidence Threshold: <span id="confidence-value">0.5</span></label>
+                        <input type="range" id="confidence-slider" class="form-control" min="0" max="1" step="0.1" value="0.5">
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="save-detections"> Save Detections
+                        </label>
+                    </div>
+                </div>
+
+                <div class="stats-section">
+                    <h3>Statistics</h3>
+                    <div class="stat-card">
+                        <div class="stat-value" id="fps-value">0.0</div>
+                        <div class="stat-label">FPS</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="detections-value">0</div>
+                        <div class="stat-label">Total Detections</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="processing-time">0ms</div>
+                        <div class="stat-label">Processing Time</div>
+                    </div>
+                </div>
+
+                <div class="detections-section">
+                    <h3>Recent Detections</h3>
+                    <div id="detections-list">
+                        <div style="text-align: center; color: #666; padding: 20px;">
+                            No detections yet
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="alerts"></div>
+    </div>
+
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // DOM elements
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const snapshotBtn = document.getElementById('snapshot-btn');
+        const statusIndicator = document.querySelector('.status-indicator');
+        const statusText = document.getElementById('status-text');
+        const videoPlaceholder = document.getElementById('video-placeholder');
+        const videoCanvas = document.getElementById('video-canvas');
+        const sourceSelect = document.getElementById('source-select');
+        const modelSelect = document.getElementById('model-select');
+        const confidenceSlider = document.getElementById('confidence-slider');
+        const confidenceValue = document.getElementById('confidence-value');
+        const saveDetections = document.getElementById('save-detections');
+        const fpsValue = document.getElementById('fps-value');
+        const detectionsValue = document.getElementById('detections-value');
+        const processingTime = document.getElementById('processing-time');
+        const detectionsList = document.getElementById('detections-list');
+        const alerts = document.getElementById('alerts');
+
+        let isProcessing = false;
+        let detections = [];
+
+        // Event listeners
+        startBtn.addEventListener('click', startProcessing);
+        stopBtn.addEventListener('click', stopProcessing);
+        snapshotBtn.addEventListener('click', takeSnapshot);
+        confidenceSlider.addEventListener('input', updateConfidence);
+
+        // Socket.IO event handlers
+        socket.on('connect', () => {
+            showAlert('Connected to server', 'success');
+        });
+
+        socket.on('disconnect', () => {
+            showAlert('Disconnected from server', 'error');
+            updateStatus('Disconnected', false);
+        });
+
+        socket.on('processing_started', (data) => {
+            if (data.success) {
+                updateStatus('Processing', true);
+                showAlert('Processing started successfully', 'success');
+            }
+        });
+
+        socket.on('processing_stopped', (data) => {
+            if (data.success) {
+                updateStatus('Stopped', false);
+                showAlert('Processing stopped', 'success');
+            }
+        });
+
+        socket.on('message', (message) => {
+            handleMessage(message);
+        });
+
+        socket.on('error', (data) => {
+            showAlert(`Error: ${data.message}`, 'error');
+        });
+
+        function startProcessing() {
+            const config = {
+                source: sourceSelect.value,
+                model: modelSelect.value,
+                confidence: parseFloat(confidenceSlider.value),
+                output: './output'
+            };
+
+            socket.emit('start_processing', config);
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            snapshotBtn.disabled = false;
+        }
+
+        function stopProcessing() {
+            socket.emit('stop_processing');
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            snapshotBtn.disabled = true;
+        }
+
+        function takeSnapshot() {
+            // Implementation for taking snapshot
+            showAlert('Snapshot saved', 'success');
+        }
+
+        function updateConfidence() {
+            confidenceValue.textContent = confidenceSlider.value;
+        }
+
+        function updateStatus(text, isProcessing) {
+            statusText.textContent = text;
+            statusIndicator.className = `status-indicator ${isProcessing ? 'status-processing' : 'status-stopped'}`;
+        }
+
+        function handleMessage(message) {
+            switch (message.type) {
+                case 'stats':
+                    updateStats(message.data);
+                    break;
+                case 'detection':
+                    addDetection(message.data);
+                    break;
+            }
+        }
+
+        function updateStats(stats) {
+            fpsValue.textContent = stats.fps.toFixed(1);
+            detectionsValue.textContent = stats.totalDetections;
+            processingTime.textContent = `${stats.processingTime}ms`;
+        }
+
+        function addDetection(detection) {
+            detections.unshift(detection);
+            if (detections.length > 10) {
+                detections = detections.slice(0, 10);
+            }
+            updateDetectionsList();
+        }
+
+        function updateDetectionsList() {
+            if (detections.length === 0) {
+                detectionsList.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">No detections yet</div>';
+                return;
+            }
+
+            detectionsList.innerHTML = detections.map(detection => `
+                <div class="detection-item">
+                    <div class="detection-class">${detection.class}</div>
+                    <div class="detection-confidence">Confidence: ${(detection.confidence * 100).toFixed(1)}%</div>
+                </div>
+            `).join('');
+        }
+
+        function showAlert(message, type) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alerts.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Initialize
+        updateStatus('Ready to start', false);
+    </script>
+</body>
+</html> 

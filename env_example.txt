@@ -1,0 +1,17 @@
+# Roboflow API Configuration
+ROBOFLOW_API_KEY=your_roboflow_api_key_here
+
+# Model Configuration
+DEFAULT_MODEL=coco
+CONFIDENCE_THRESHOLD=0.5
+
+# Video Stream Configuration
+DEFAULT_SOURCE=0
+FRAME_RATE=30
+RESOLUTION_WIDTH=640
+RESOLUTION_HEIGHT=480
+
+# Output Configuration
+SAVE_DETECTIONS=true
+OUTPUT_DIR=./output
+LOG_LEVEL=INFO 
