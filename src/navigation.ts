@@ -33,6 +33,7 @@ export class LiveNavigation {
     private isActive: boolean = false;
     private arrivalThreshold: number = 20; // 20 feet threshold for step completion
     private googleDirections: GoogleDirectionsAPI;
+    private isRouteLoaded: boolean = false;
     
     // Turn alert thresholds
     private turnAlert100Feet: number = 100; // 100 feet before turn
@@ -57,7 +58,7 @@ export class LiveNavigation {
     constructor(elevenLabsVoiceId?: string) {
         this.googleDirections = new GoogleDirectionsAPI();
         this.elevenLabsVoiceId = elevenLabsVoiceId || process.env.ELEVENLABS_VOICE_ID || '';
-        this.loadRouteData();
+        // Don't load route data immediately - wait for user location
     }
 
     // Set audio session for TTS functionality
@@ -65,9 +66,12 @@ export class LiveNavigation {
         this.audioSession = audioSession;
     }
 
-    // Load route data from Google Directions API
-    private async loadRouteData(): Promise<void> {
+    // Load route data from Google Directions API using user's current location
+    public async loadRouteData(userLocation: Location): Promise<void> {
         try {
+            // Set the user's current location as the origin
+            this.googleDirections.setCurrentLocation(userLocation);
+            
             this.routeSteps = await this.googleDirections.fetchRouteData();
             console.log(`🗺️ Loaded ${this.routeSteps.length} navigation steps from Google Directions API`);
             
@@ -78,10 +82,18 @@ export class LiveNavigation {
                     alert20Feet: false  // changed from alert15Feet
                 };
             });
+            
+            this.isRouteLoaded = true;
         } catch (error) {
             console.error("❌ Error loading route data:", error);
             this.routeSteps = [];
+            this.isRouteLoaded = false;
         }
+    }
+
+    // Check if route is loaded
+    public isRouteReady(): boolean {
+        return this.isRouteLoaded && this.routeSteps.length > 0;
     }
 
     // Calculate distance between two points using Haversine formula (in meters)
@@ -223,11 +235,16 @@ export class LiveNavigation {
         }
     }
 
-    // Start navigation
+    // Start navigation - now requires route to be loaded first
     public async startNavigation(): Promise<void> {
+        if (!this.isRouteReady()) {
+            console.error("❌ Cannot start navigation - route not loaded");
+            return;
+        }
+        
         this.currentStepIndex = 0;
         this.isActive = true;
-        console.log(" Navigation started");
+        console.log("🚀 Navigation started");
         
         // Speak welcome message with route summary
         if (this.routeSteps.length > 0) {
@@ -383,7 +400,7 @@ export class LiveNavigation {
         };
     }
 
-    // Get route summary
+    // Get route summary - now checks if route is loaded
     public async getRouteSummary(): Promise<{
         totalSteps: number;
         totalDistance: string;
@@ -391,31 +408,22 @@ export class LiveNavigation {
         startAddress: string;
         endAddress: string;
     }> {
-        try {
-            const summary = await this.googleDirections.getRouteSummary();
+        if (!this.isRouteReady()) {
             return {
-                totalSteps: summary.totalSteps,
-                totalDistance: summary.totalDistance,
-                totalDuration: summary.totalDuration,
-                startAddress: summary.startAddress,
-                endAddress: summary.endAddress
-            };
-        } catch (error) {
-            console.error("Error getting route summary:", error);
-            return {
-                totalSteps: this.routeSteps.length,
-                totalDistance: "Unknown",
-                totalDuration: "Unknown",
-                startAddress: "Unknown",
-                endAddress: "Unknown"
+                totalSteps: 0,
+                totalDistance: "Route not loaded",
+                totalDuration: "Route not loaded",
+                startAddress: "Route not loaded",
+                endAddress: "Route not loaded"
             };
         }
+        
+        return await this.googleDirections.getRouteSummary();
     }
 
-    // Refresh route data (useful for getting updated routes)
-    public async refreshRoute(): Promise<void> {
-        console.log("🔄 Refreshing route data...");
-        await this.loadRouteData();
-        console.log(`✅ Route refreshed: ${this.routeSteps.length} steps loaded`);
+    // Refresh route with new user location
+    public async refreshRoute(userLocation: Location): Promise<void> {
+        console.log("🔄 Refreshing route with new user location...");
+        await this.loadRouteData(userLocation);
     }
 } 

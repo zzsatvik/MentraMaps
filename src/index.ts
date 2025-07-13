@@ -45,27 +45,43 @@ class LiveNavigationApp extends AppServer {
            console.log("🔇 TTS disabled - no voice ID provided");
        }
        
-       // Wait for route data to load
-       session.layouts.showTextWall("🗺️ Loading route data...");
+       // Wait for user location and load route data
+       session.layouts.showTextWall("📍 Getting your location...");
        
-       const routeSummary = await navigation.getRouteSummary();
-       
-       if (routeSummary.totalSteps === 0) {
-           session.layouts.showTextWall("❌ No route data available");
-           console.error("No route steps found");
-           return;
-       }
-
-       console.log(`🗺️ Route loaded: ${routeSummary.totalSteps} steps, ${routeSummary.totalDistance}`);
-       console.log(`📍 From: ${routeSummary.startAddress}`);
-       console.log(`🎯 To: ${routeSummary.endAddress}`);
-       
-       session.layouts.showTextWall(`🗺️ Live Navigation Started!\n\n${routeSummary.totalSteps} steps\n${routeSummary.totalDistance}`);
-
-       // Navigation state
        let currentLocation: { lat: number; lng: number } | null = null;
        let isNavigating = false;
        let navigationInterval: NodeJS.Timeout | null = null;
+       
+       try {
+           // Get initial location with high accuracy
+           console.log("📍 Getting initial user location...");
+           const initialLocation = await session.location.getLatestLocation({ accuracy: 'high' });
+           currentLocation = { lat: initialLocation.lat, lng: initialLocation.lng };
+           
+           console.log(`📍 Initial location: ${currentLocation.lat}, ${currentLocation.lng}`);
+           
+           // Load route data using user's current location
+           session.layouts.showTextWall("🗺️ Loading route data...");
+           await navigation.loadRouteData(currentLocation);
+           
+           if (!navigation.isRouteReady()) {
+               session.layouts.showTextWall("❌ Could not load route data");
+               console.error("Failed to load route data");
+               return;
+           }
+           
+           const routeSummary = await navigation.getRouteSummary();
+           console.log(`🗺️ Route loaded: ${routeSummary.totalSteps} steps, ${routeSummary.totalDistance}`);
+           console.log(`📍 From: ${routeSummary.startAddress}`);
+           console.log(`🎯 To: ${routeSummary.endAddress}`);
+           
+           session.layouts.showTextWall(`🗺️ Live Navigation Ready!\n\n${routeSummary.totalSteps} steps\n${routeSummary.totalDistance}`);
+           
+       } catch (error) {
+           console.error("❌ Error getting initial location or loading route:", error);
+           session.layouts.showTextWall("❌ Could not get location or load route");
+           return;
+       }
 
        // Subscribe to real-time location stream
        console.log("📍 Subscribing to real-time location stream...");
@@ -76,11 +92,11 @@ class LiveNavigationApp extends AppServer {
                currentLocation = { lat: data.lat, lng: data.lng };
                if (!isNavigating) {
                    isNavigating = true;
-                   await navigation.startNavigation(); // Now async
+                   await navigation.startNavigation();
                    console.log("🚶 Navigation started - tracking user location");
                }
            }
-       );``
+       );
 
        console.log("✅ Location stream subscription created");
 
@@ -88,19 +104,12 @@ class LiveNavigationApp extends AppServer {
        navigationInterval = setInterval(async () => {
            try {
                if (!currentLocation) {
-                   // Fallback: get latest location if stream hasn't provided data yet
-                   const location = await session.location.getLatestLocation({ accuracy: 'realtime' });
-                   currentLocation = { lat: location.lat, lng: location.lng };
-                   console.log("🔄 Got initial location via fallback");
-                   
-                   if (!isNavigating) {
-                       isNavigating = true;
-                       await navigation.startNavigation(); // Now async
-                   }
+                   console.log("⚠️ No current location available, skipping update");
+                   return;
                }
 
                if (currentLocation) {
-                   // Update navigation based on current location (now async for TTS)
+                   // Update navigation based on current location
                    const update = await navigation.updateNavigation(currentLocation);
                    const status = update.status;
 
@@ -118,7 +127,7 @@ class LiveNavigationApp extends AppServer {
                        
                        console.log("=========================");
 
-                       // Display basic navigation info on glasses (no turn alerts - they're spoken)
+                       // Display basic navigation info on glasses
                        const displayText = `${status.progress}\n\n${status.stepInstructions}\n\nDistance: ${status.distanceInFeet.toFixed(0)} ft`;
                        session.layouts.showTextWall(displayText);
                    }
@@ -135,7 +144,6 @@ class LiveNavigationApp extends AppServer {
                        } else {
                            session.layouts.showTextWall(`✅ Step completed!\n\nNext: ${update.nextInstructions}`);
                            console.log(`➡️ Step completed, moving to next step`);
-                           // Note: TTS for next instruction is handled in the navigation class
                        }
                    }
                }

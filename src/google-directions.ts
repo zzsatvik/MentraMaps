@@ -55,15 +55,13 @@ export class GoogleDirectionsAPI {
     private directionsUrl: string = 'https://maps.googleapis.com/maps/api/directions/json';
     private placesUrl: string = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
 
-    // Hardcoded origin and destination coordinates
-    private origin: Location = {
-        lat: 37.5759304,
-        lng: -122.0260616
-    };
+    // Current user location - will be set dynamically
+    private currentOrigin: Location | null = null;
 
+    // Hardcoded destination coordinates (can be updated later to be dynamic too)
     private destination: Location = {
-        lat: 37.5755163,
-        lng: -122.0273217
+        lat: 37.761120,
+        lng: -122.386703
     };
 
     constructor(apiKey?: string) {
@@ -73,10 +71,25 @@ export class GoogleDirectionsAPI {
         }
     }
 
+    // Set the current user location (origin)
+    public setCurrentLocation(location: Location): void {
+        this.currentOrigin = location;
+        console.log(`📍 Updated user location to: ${location.lat}, ${location.lng}`);
+    }
+
+    // Get current user location
+    public getCurrentLocation(): Location | null {
+        return this.currentOrigin;
+    }
+
     // Build the API URL with parameters
     private buildDirectionsApiUrl(): string {
+        if (!this.currentOrigin) {
+            throw new Error("Current user location not set. Call setCurrentLocation() first.");
+        }
+
         const params = new URLSearchParams({
-            origin: `${this.origin.lat},${this.origin.lng}`,
+            origin: `${this.currentOrigin.lat},${this.currentOrigin.lng}`,
             destination: `${this.destination.lat},${this.destination.lng}`,
             mode: 'walking',
             key: this.apiKey
@@ -130,7 +143,7 @@ export class GoogleDirectionsAPI {
 
         try {
             console.log("🗺️ Fetching route from Google Directions API...");
-            console.log(`📍 Origin: ${this.origin.lat}, ${this.origin.lng}`);
+            console.log(`📍 Origin: ${this.currentOrigin?.lat}, ${this.currentOrigin?.lng}`);
             console.log(`🎯 Destination: ${this.destination.lat}, ${this.destination.lng}`);
 
             const response = await fetch(this.buildDirectionsApiUrl());
@@ -267,7 +280,7 @@ export class GoogleDirectionsAPI {
                 totalDuration: `${Math.round(totalDuration / 60)} min`,
                 startAddress: "3263 Cade Dr, Fremont, CA 94536, USA",
                 endAddress: "35238 Erving Ct, Fremont, CA 94536, USA",
-                origin: this.origin,
+                origin: this.currentOrigin || { lat: 0, lng: 0 },
                 destination: this.destination
             };
         }
@@ -284,7 +297,7 @@ export class GoogleDirectionsAPI {
                     totalDuration: leg.duration.text,
                     startAddress: leg.start_address,
                     endAddress: leg.end_address,
-                    origin: this.origin,
+                    origin: this.currentOrigin || { lat: 0, lng: 0 },
                     destination: this.destination
                 };
             }
@@ -306,7 +319,7 @@ export class GoogleDirectionsAPI {
 
     // Update the route with new origin and destination
     public updateRoute(origin: Location, destination: Location): void {
-        this.origin = origin;
+        this.currentOrigin = origin;
         this.destination = destination;
         console.log(`🔄 Route updated: New origin ${origin.lat},${origin.lng} and destination ${destination.lat},${destination.lng}`);
     }
