@@ -94,16 +94,15 @@ export class GoogleDirectionsAPI {
 
         const params = new URLSearchParams({
             location: `${location.lat},${location.lng}`,
-            radius: '1500', // Search within a 1500-meter radius
+            radius: '16094', // Search within a 10-mile radius (16094 meters)
             keyword: query,
-            rankby: 'distance', // Rank results by distance, which requires a keyword
             key: this.apiKey
         });
 
         const url = `${this.placesUrl}?${params.toString()}`;
         
         try {
-            console.log(`🔎 Searching for nearest "${query}" near ${location.lat},${location.lng}`);
+            console.log(`🔎 Searching for nearest "${query}" within 10-mile radius of ${location.lat},${location.lng}`);
             const response = await fetch(url);
             const data = await response.json();
 

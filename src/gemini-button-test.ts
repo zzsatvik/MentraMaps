@@ -107,13 +107,58 @@ class GeminiButtonTestApp extends AppServer {
        createTranscriptionStream('en-US');
        console.log("🎤 Created English transcription stream");
 
-       // More flexible prompt for Gemini
-       const createPrompt = (context: string) => {
-           return `You are a helpful assistant. Please respond naturally to the user's request based on the following context.
-           
+       // More focused prompt for navigational assistance
+       const createNavigationalPrompt = (context: string) => {
+           return `You are a specialized navigation assistant designed to help blind and visually impaired users locate nearby places. Your ONLY function is to help with location and navigation queries.
+
+IMPORTANT RULES:
+1. You can ONLY help with finding nearby places, locations, and navigation
+2. If asked about anything else (weather, general questions, conversations, etc.), politely decline and remind the user you are a navigation tool
+3. Always include specific location details (name, address, coordinates) when available
+4. Be concise and clear in your responses
+5. Focus on actionable navigation information
+6. You search within a 10-mile radius from the user's location - mention this when relevant
+
 Context:
 ${context}
-`;
+
+Response format for location queries: Include the place name, address/vicinity, and coordinates if available.
+For non-navigation queries: "I'm sorry, I can only help with navigation and finding nearby places. Please ask me about locations near you."`;
+       };
+
+       // Enhanced pattern matching for navigation queries
+       const isNavigationQuery = (query: string): { isNavigation: boolean; placeQuery?: string } => {
+           const lowerQuery = query.toLowerCase();
+           
+           // Patterns for finding nearest places
+           const patterns = [
+               /(?:where is|what is|find|locate|show me) (?:the )?nearest (.+)/,
+               /(?:where can i find|how do i get to|directions to) (?:the )?nearest (.+)/,
+               /(?:find|locate|show) (?:me )?(?:the )?nearest (.+)/,
+               /(?:what's|where's) (?:the )?nearest (.+)/,
+               /nearest (.+) (?:near me|nearby|around here)/,
+               /(.+) (?:near me|nearby|around here|close by)/,
+               /(?:how far is|distance to) (?:the )?nearest (.+)/
+           ];
+
+           for (const pattern of patterns) {
+               const match = lowerQuery.match(pattern);
+               if (match && match[1]) {
+                   return { isNavigation: true, placeQuery: match[1].trim() };
+               }
+           }
+
+           // Additional navigation keywords
+           const navigationKeywords = [
+               'directions', 'navigate', 'location', 'address', 'coordinates',
+               'nearby', 'close', 'distance', 'route', 'path', 'way to'
+           ];
+
+           const hasNavigationKeyword = navigationKeywords.some(keyword => 
+               lowerQuery.includes(keyword)
+           );
+
+           return { isNavigation: hasNavigationKeyword };
        };
        
        // Listen for final transcription data
@@ -153,11 +198,13 @@ ${context}
 
                    let response: string;
 
-                   // Check if the user is asking for the nearest place
-                   const nearestMatch = userPrompt.toLowerCase().match(/where is the nearest (.+)/);
-                   if (nearestMatch && nearestMatch[1]) {
-                       const placeQuery = nearestMatch[1].trim();
-                       console.log(`🔎 User is asking for the nearest: "${placeQuery}"`);
+                   // Check if this is a navigation query
+                   const queryAnalysis = isNavigationQuery(userPrompt);
+                   
+                   if (queryAnalysis.isNavigation && queryAnalysis.placeQuery) {
+                       // Handle specific place queries
+                       const placeQuery = queryAnalysis.placeQuery;
+                       console.log(`🔎 User is asking for navigation to: "${placeQuery}"`);
                        
                        const nearestPlace = await googleDirections.findNearest(placeQuery, {
                            lat: currentLocation.latitude,
@@ -165,17 +212,23 @@ ${context}
                        });
 
                        if (nearestPlace) {
-                           const context = `The user wants to know where the nearest ${placeQuery} is. I found a place called "${nearestPlace.name}" at ${nearestPlace.vicinity}. Please tell them this in a friendly way.`;
-                           const prompt = createPrompt(context);
+                           const context = `The user wants to find the nearest ${placeQuery}. I found a place called "${nearestPlace.name}" at ${nearestPlace.vicinity}. The location coordinates are approximately ${currentLocation.latitude}, ${currentLocation.longitude} (user's current location). Please provide the place name, address, and mention the coordinates in a helpful way for navigation.`;
+                           const prompt = createNavigationalPrompt(context);
                            response = await geminiClient.generateResponse(prompt);
                        } else {
-                           const context = `The user asked for the nearest ${placeQuery}, but I couldn't find anything nearby. Please apologize and let them know.`;
-                           const prompt = createPrompt(context);
+                           const context = `The user asked for the nearest ${placeQuery}, but I couldn't find anything nearby their location (${currentLocation.latitude}, ${currentLocation.longitude}). Please apologize and suggest they try a different search term or location.`;
+                           const prompt = createNavigationalPrompt(context);
                            response = await geminiClient.generateResponse(prompt);
                        }
+                   } else if (queryAnalysis.isNavigation) {
+                       // General navigation query but no specific place
+                       const context = `The user asked a navigation-related question: "${userPrompt}". Their location is ${currentLocation.latitude}, ${currentLocation.longitude}. Please help them with navigation or ask them to be more specific about what they're looking for.`;
+                       const prompt = createNavigationalPrompt(context);
+                       response = await geminiClient.generateResponse(prompt);
                    } else {
-                       // If not a "nearest" query, use the general prompt
-                       const prompt = createPrompt(`The user's location is ${currentLocation.latitude}, ${currentLocation.longitude}. The user said: "${userPrompt}"`);
+                       // Non-navigation query - politely decline
+                       const context = `The user asked: "${userPrompt}". This is not a navigation or location query. Please politely decline and remind them that you are a navigation assistant for blind and visually impaired users.`;
+                       const prompt = createNavigationalPrompt(context);
                        response = await geminiClient.generateResponse(prompt);
                    }
                    
@@ -183,7 +236,7 @@ ${context}
 
                    // Speak the response using ElevenLabs
                    if (ELEVENLABS_VOICE_ID) {
-                       console.log(`️ Speaking response with ElevenLabs...`);
+                       console.log(`🔊 Speaking response with ElevenLabs...`);
                        await session.audio.speak(response, {
                            voice_id: ELEVENLABS_VOICE_ID
                        });
@@ -193,6 +246,7 @@ ${context}
                    }
 
                    console.log(`🎯 FINAL RESULT:`);
+                   console.log(`Query Type: ${queryAnalysis.isNavigation ? 'Navigation' : 'Non-navigation'}`);
                    console.log(`Location: ${currentLocation.latitude}, ${currentLocation.longitude}`);
                    console.log(`Response: "${response}"`);
                    console.log(`---`);
