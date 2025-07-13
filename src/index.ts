@@ -3,14 +3,16 @@ import { LiveNavigation } from './navigation';
 
 // Load configuration from environment variables
 const PACKAGE_NAME = process.env.PACKAGE_NAME || "com.example.myfirstmentraosapp";
-const PORT = parseInt(process.env.PORT || "3000");
+const PORT = parseInt(process.env.PORT || "3001");
 const MENTRAOS_API_KEY = process.env.MENTRAOS_API_KEY || "demo_key";
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID;
 
-console.log("=== MentraOS Live Navigation App ===");
+console.log("=== MentraOS Live Navigation with TTS ===");
 console.log(`Package Name: ${PACKAGE_NAME}`);
 console.log(`Port: ${PORT}`);
 console.log(`API Key: ${MENTRAOS_API_KEY ? "Set" : "Not set"}`);
-console.log("====================================");
+console.log(`ElevenLabs Voice ID: ${ELEVENLABS_VOICE_ID ? "Set" : "Not set"}`);
+console.log("==========================================");
 
 if (!MENTRAOS_API_KEY || MENTRAOS_API_KEY === "demo_key") {
    console.error("MENTRAOS_API_KEY environment variable is required");
@@ -18,8 +20,12 @@ if (!MENTRAOS_API_KEY || MENTRAOS_API_KEY === "demo_key") {
    console.error("For now, using demo key for testing...");
 }
 
+if (!ELEVENLABS_VOICE_ID) {
+   console.warn("⚠️ ELEVENLABS_VOICE_ID not set - TTS will be disabled");
+}
+
 /**
- * Live Navigation App - Provides turn-by-turn navigation using real-time location
+ * Live Navigation App with TTS - Provides turn-by-turn navigation using real-time location and voice guidance
  */
 class LiveNavigationApp extends AppServer {
    protected async onSession(session: AppSession, sessionId: string, userId: string): Promise<void> {
@@ -28,8 +34,16 @@ class LiveNavigationApp extends AppServer {
        console.log(`User ID: ${userId}`);
        session.logger.info(`New navigation session: ${sessionId} for user ${userId}`);
 
-       // Initialize navigation system
-       const navigation = new LiveNavigation();
+       // Initialize navigation system with TTS
+       const navigation = new LiveNavigation(ELEVENLABS_VOICE_ID);
+       
+       // Set up audio session for TTS
+       if (ELEVENLABS_VOICE_ID) {
+           navigation.setAudioSession(session.audio);
+           console.log("🎤 TTS enabled with ElevenLabs voice");
+       } else {
+           console.log("🔇 TTS disabled - no voice ID provided");
+       }
        
        // Wait for route data to load
        session.layouts.showTextWall("🗺️ Loading route data...");
@@ -58,11 +72,11 @@ class LiveNavigationApp extends AppServer {
 
        const stopLocationUpdates = session.location.subscribeToStream(
            { accuracy: 'realtime' },
-           (data) => {
+           async (data) => {
                currentLocation = { lat: data.lat, lng: data.lng };
                if (!isNavigating) {
                    isNavigating = true;
-                   navigation.startNavigation();
+                   await navigation.startNavigation(); // Now async
                    console.log("🚶 Navigation started - tracking user location");
                }
            }
@@ -81,13 +95,13 @@ class LiveNavigationApp extends AppServer {
                    
                    if (!isNavigating) {
                        isNavigating = true;
-                       navigation.startNavigation();
+                       await navigation.startNavigation(); // Now async
                    }
                }
 
                if (currentLocation) {
-                   // Update navigation based on current location
-                   const update = navigation.updateNavigation(currentLocation);
+                   // Update navigation based on current location (now async for TTS)
+                   const update = await navigation.updateNavigation(currentLocation);
                    const status = update.status;
 
                    if (status.isActive) {
@@ -104,7 +118,7 @@ class LiveNavigationApp extends AppServer {
                        
                        console.log("=========================");
 
-                       // Display basic navigation info on glasses (no turn alerts)
+                       // Display basic navigation info on glasses (no turn alerts - they're spoken)
                        const displayText = `${status.progress}\n\n${status.stepInstructions}\n\nDistance: ${status.distanceInFeet.toFixed(0)} ft`;
                        session.layouts.showTextWall(displayText);
                    }
@@ -121,6 +135,7 @@ class LiveNavigationApp extends AppServer {
                        } else {
                            session.layouts.showTextWall(`✅ Step completed!\n\nNext: ${update.nextInstructions}`);
                            console.log(`➡️ Step completed, moving to next step`);
+                           // Note: TTS for next instruction is handled in the navigation class
                        }
                    }
                }
@@ -150,11 +165,16 @@ const server = new LiveNavigationApp({
    port: PORT
 });
 
-console.log("🚀 Starting Live Navigation server...");
+console.log("🚀 Starting Live Navigation with TTS server...");
 server.start().then(() => {
    console.log(`✅ Navigation server started successfully on port ${PORT}`);
    console.log("📱 Waiting for device connections...");
-   console.log("🗺️ Turn-by-turn navigation will begin when a session connects");
+   console.log("🗺️ Turn-by-turn navigation with voice guidance will begin when a session connects");
+   if (ELEVENLABS_VOICE_ID) {
+       console.log("🎤 ElevenLabs TTS is enabled");
+   } else {
+       console.log("🔇 ElevenLabs TTS is disabled - set ELEVENLABS_VOICE_ID to enable");
+   }
 }).catch(err => {
    console.error("❌ Failed to start navigation server:", err);
 });

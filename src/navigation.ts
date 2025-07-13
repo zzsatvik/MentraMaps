@@ -45,9 +45,19 @@ export class LiveNavigation {
         }
     } = {};
 
-    constructor() {
+    // ElevenLabs TTS configuration
+    private elevenLabsVoiceId: string;
+    private audioSession: any = null; // Will be set by the main app
+
+    constructor(elevenLabsVoiceId?: string) {
         this.googleDirections = new GoogleDirectionsAPI();
+        this.elevenLabsVoiceId = elevenLabsVoiceId || process.env.ELEVENLABS_VOICE_ID || '';
         this.loadRouteData();
+    }
+
+    // Set audio session for TTS functionality
+    public setAudioSession(audioSession: any): void {
+        this.audioSession = audioSession;
     }
 
     // Load route data from Google Directions API
@@ -112,8 +122,40 @@ export class LiveNavigation {
         return 'unknown';
     }
 
+    // Speak text using ElevenLabs TTS
+    private async speakText(text: string, priority: 'high' | 'normal' = 'normal'): Promise<void> {
+        if (!this.audioSession || !this.elevenLabsVoiceId) {
+            console.log(`️ TTS not available: "${text}"`);
+            return;
+        }
+
+        try {
+            console.log(`️ Speaking: "${text}"`);
+            
+            const result = await this.audioSession.speak(text, {
+                voice_id: this.elevenLabsVoiceId,
+                model_id: priority === 'high' ? 'eleven_flash_v2_5' : 'eleven_turbo_v2_5',
+                voice_settings: {
+                    stability: priority === 'high' ? 0.8 : 0.6,
+                    similarity_boost: 0.85,
+                    style: 0.5,
+                    use_speaker_boost: false,
+                    speed: 0.95
+                }
+            });
+
+            if (result.success) {
+                console.log(`✅ TTS successful: "${text}"`);
+            } else {
+                console.error(`❌ TTS failed: ${result.error}`);
+            }
+        } catch (error) {
+            console.error(`❌ TTS error: ${error}`);
+        }
+    }
+
     // Check and trigger turn alerts
-    private checkTurnAlerts(userLocation: Location): void {
+    private async checkTurnAlerts(userLocation: Location): Promise<void> {
         if (this.currentStepIndex >= this.routeSteps.length) return;
 
         const currentStep = this.routeSteps[this.currentStepIndex];
@@ -135,7 +177,9 @@ export class LiveNavigation {
             distanceInFeet > this.turnAlert15Feet && 
             !this.alertsShown[this.currentStepIndex].alert100Feet) {
             
-            console.log(`🚨 TURN ALERT: Turn ${turnDirection} in 100 feet!`);
+            const alertMessage = `Turn ${turnDirection} in 100 feet`;
+            console.log(`🚨 TURN ALERT: ${alertMessage}!`);
+            await this.speakText(alertMessage, 'high');
             this.alertsShown[this.currentStepIndex].alert100Feet = true;
         }
 
@@ -143,22 +187,42 @@ export class LiveNavigation {
         if (distanceInFeet <= this.turnAlert15Feet && 
             !this.alertsShown[this.currentStepIndex].alert15Feet) {
             
-            console.log(`🚨 TURN ALERT: Turn ${turnDirection} in 15 feet!`);
+            const alertMessage = `Turn ${turnDirection} in 15 feet`;
+            console.log(`🚨 TURN ALERT: ${alertMessage}!`);
+            await this.speakText(alertMessage, 'high');
             this.alertsShown[this.currentStepIndex].alert15Feet = true;
         }
     }
 
     // Start navigation
-    public startNavigation(): void {
+    public async startNavigation(): Promise<void> {
         this.currentStepIndex = 0;
         this.isActive = true;
-        console.log("🚶 Navigation started");
+        console.log(" Navigation started");
+        
+        // Speak welcome message with route summary
+        if (this.routeSteps.length > 0) {
+            const totalSteps = this.routeSteps.length;
+            const totalDistance = this.routeSteps.reduce((sum, step) => sum + step.distance.value, 0);
+            const distanceInMiles = (totalDistance * 3.28084 / 5280).toFixed(1); // Convert meters to miles
+            
+            const welcomeMessage = `Navigation started. Your route has ${totalSteps} step${totalSteps > 1 ? 's' : ''} and is ${distanceInMiles} mile${distanceInMiles !== '1.0' ? 's' : ''} long.`;
+            
+            console.log(`🎤 Speaking welcome: "${welcomeMessage}"`);
+            await this.speakText(welcomeMessage);
+            
+            // Also speak the first instruction
+            const firstStep = this.routeSteps[0];
+            const firstInstruction = this.cleanInstructions(firstStep.html_instructions);
+            console.log(`🎤 Speaking first instruction: "${firstInstruction}"`);
+            await this.speakText(firstInstruction);
+        }
     }
 
     // Stop navigation
     public stopNavigation(): void {
         this.isActive = false;
-        console.log("🛑 Navigation stopped");
+        console.log(" Navigation stopped");
     }
 
     // Get current navigation status
@@ -218,12 +282,12 @@ export class LiveNavigation {
     }
 
     // Update navigation based on user location
-    public updateNavigation(userLocation: Location): {
+    public async updateNavigation(userLocation: Location): Promise<{
         stepCompleted: boolean;
         destinationReached: boolean;
         nextInstructions: string;
         status: any;
-    } {
+    }> {
         const status = this.getNavigationStatus(userLocation);
         
         if (!status.isActive) {
@@ -236,7 +300,7 @@ export class LiveNavigation {
         }
 
         // Check for turn alerts
-        this.checkTurnAlerts(userLocation);
+        await this.checkTurnAlerts(userLocation);
 
         // Check if current step is completed
         if (status.isStepCompleted) {
@@ -254,6 +318,7 @@ export class LiveNavigation {
             // Check if destination is reached
             if (this.currentStepIndex >= this.routeSteps.length) {
                 console.log("🎉 Destination reached!");
+                await this.speakText("You have arrived at your destination!");
                 this.stopNavigation();
                 return {
                     stepCompleted: true,
@@ -266,6 +331,10 @@ export class LiveNavigation {
                 const nextStep = this.routeSteps[this.currentStepIndex];
                 const nextInstructions = this.cleanInstructions(nextStep.html_instructions);
                 console.log(`➡️ Moving to step ${this.currentStepIndex + 1}: ${nextInstructions}`);
+                
+                // Speak the new direction instruction
+                await this.speakText(nextInstructions);
+                
                 return {
                     stepCompleted: true,
                     destinationReached: false,
