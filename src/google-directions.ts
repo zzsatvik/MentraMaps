@@ -48,13 +48,13 @@ export class GoogleDirectionsAPI {
 
     // Hardcoded origin and destination coordinates
     private origin: Location = {
-        lat: 37.573042,
-        lng: -122.026170
+        lat: 37.5759501,
+        lng: -122.0257665
     };
 
     private destination: Location = {
-        lat: 37.573042,
-        lng: -122.026170
+        lat: 37.5762868,
+        lng: -122.0264431
     };
 
     constructor(apiKey?: string) {
