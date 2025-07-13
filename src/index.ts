@@ -32,23 +32,29 @@ class MyMentraOSApp extends AppServer {
        session.layouts.showTextWall("Hello, World!");
 
 
-       // Get location once
-       try {
-           console.log("Attempting to get location...");
-           const location = await session.location.getLatestLocation({ accuracy: 'tenMeters' });
-           console.log("Location retrieved successfully!");
-           console.log(`Latitude: ${location.lat}, Longitude: ${location.lng}`);
-           session.logger.info(`Location: ${location.lat}, ${location.lng}`);
-           session.layouts.showTextWall(`Location: ${location.lat}, ${location.lng}`);
-       } catch (error) {
-           console.error("Could not get location:", error);
-           console.error("Error details:", error instanceof Error ? error.message : String(error));
-       }
+       // Subscribe to real-time location stream for continuous updates
+       console.log("Subscribing to real-time location stream...");
 
+       const stopLocationUpdates = session.location.subscribeToStream(
+           { accuracy: 'realtime' },
+           (data) => {
+               // This function is called every time a new location update arrives
+               console.log("=== NEW LOCATION UPDATE ===");
+               console.log(`Latitude: ${data.lat}`);
+               console.log(`Longitude: ${data.lng}`);
+               console.log(`Timestamp: ${new Date().toISOString()}`);
+               console.log("==========================");
 
-       // Log when the session is disconnected
+               // Update the display on the glasses with the latest location
+               session.layouts.showTextWall(`Real-time Location: ${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}`);
+           }
+       );
+
+       // Log when the session is disconnected and clean up the subscription
        session.events.onDisconnected(() => {
            session.logger.info(`Session ${sessionId} disconnected.`);
+           // Stop the location updates when session ends
+           stopLocationUpdates();
        });
    }
 }
