@@ -1,0 +1,141 @@
+{
+    "geocoded_waypoints": [
+        {
+            "geocoder_status": "OK",
+            "place_id": "ChIJk0eIRMW_j4ARC618BeRDTGw",
+            "types": [
+                "premise",
+                "street_address"
+            ]
+        },
+        {
+            "geocoder_status": "OK",
+            "place_id": "ChIJfRxWjcW_j4ARoAEYCuYWamQ",
+            "types": [
+                "premise",
+                "street_address"
+            ]
+        }
+    ],
+    "routes": [
+        {
+            "bounds": {
+                "northeast": {
+                    "lat": 37.5757155,
+                    "lng": -122.0251384
+                },
+                "southwest": {
+                    "lat": 37.5728826,
+                    "lng": -122.0270207
+                }
+            },
+            "copyrights": "Powered by Google, ©2025 Google",
+            "legs": [
+                {
+                    "distance": {
+                        "text": "0.3 mi",
+                        "value": 437
+                    },
+                    "duration": {
+                        "text": "6 mins",
+                        "value": 352
+                    },
+                    "end_address": "35238 Erving Ct, Fremont, CA 94536, USA",
+                    "end_location": {
+                        "lat": 37.5728826,
+                        "lng": -122.0263133
+                    },
+                    "start_address": "3263 Cade Dr, Fremont, CA 94536, USA",
+                    "start_location": {
+                        "lat": 37.5757072,
+                        "lng": -122.0259204
+                    },
+                    "steps": [
+                        {
+                            "distance": {
+                                "text": "266 ft",
+                                "value": 81
+                            },
+                            "duration": {
+                                "text": "1 min",
+                                "value": 65
+                            },
+                            "end_location": {
+                                "lat": 37.5753831,
+                                "lng": -122.0251384
+                            },
+                            "html_instructions": "Head <b>east</b> on <b>Cade Dr</b> toward <b>Wyndham Dr</b>",
+                            "polyline": {
+                                "points": "e_jdF~dxgVAG?C?E?C@G@CVo@f@iA"
+                            },
+                            "start_location": {
+                                "lat": 37.5757072,
+                                "lng": -122.0259204
+                            },
+                            "travel_mode": "WALKING"
+                        },
+                        {
+                            "distance": {
+                                "text": "0.2 mi",
+                                "value": 286
+                            },
+                            "duration": {
+                                "text": "4 mins",
+                                "value": 228
+                            },
+                            "end_location": {
+                                "lat": 37.5732824,
+                                "lng": -122.0270207
+                            },
+                            "html_instructions": "Turn <b>right</b> onto <b>Wyndham Dr</b>",
+                            "maneuver": "turn-right",
+                            "polyline": {
+                                "points": "c}idFb`xgVNL|@v@dBxAJJ`BtADFzBlB"
+                            },
+                            "start_location": {
+                                "lat": 37.5753831,
+                                "lng": -122.0251384
+                            },
+                            "travel_mode": "WALKING"
+                        },
+                        {
+                            "distance": {
+                                "text": "230 ft",
+                                "value": 70
+                            },
+                            "duration": {
+                                "text": "1 min",
+                                "value": 59
+                            },
+                            "end_location": {
+                                "lat": 37.5728826,
+                                "lng": -122.0263133
+                            },
+                            "html_instructions": "Turn <b>left</b> onto <b>Erving Ct</b><div style=\"font-size:0.9em\">Destination will be on the left</div>",
+                            "maneuver": "turn-left",
+                            "polyline": {
+                                "points": "_pidFzkxgVJSbAyB"
+                            },
+                            "start_location": {
+                                "lat": 37.5732824,
+                                "lng": -122.0270207
+                            },
+                            "travel_mode": "WALKING"
+                        }
+                    ],
+                    "traffic_speed_entry": [],
+                    "via_waypoint": []
+                }
+            ],
+            "overview_polyline": {
+                "points": "e_jdF~dxgVAUbAeC~DjDfB|AzBlBJSbAyB"
+            },
+            "summary": "Wyndham Dr",
+            "warnings": [
+                "Walking directions are in beta. Use caution – This route may be missing sidewalks or pedestrian paths."
+            ],
+            "waypoint_order": []
+        }
+    ],
+    "status": "OK"
+}
